@@ -1,18 +1,30 @@
-use reqwest;
+use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT, ACCEPT, ACCEPT_ENCODING, ACCEPT_LANGUAGE};
 use scraper::{Html, Selector};
 use url::Url;
+use std::error::Error;
+use tokio::time::{sleep, Duration};
+use reqwest::Client;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let base_url = "https://www.google.com/search";
-    let query = "Software Engineer Intern site:greenhouse.io";
+async fn build_client() -> Result<Client, reqwest::Error> {
+    let mut headers = HeaderMap::new();
+    headers.insert(USER_AGENT, HeaderValue::from_static("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/62.0.3202.94 Safari/537.36"));
+    headers.insert(ACCEPT, HeaderValue::from_static("text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8"));
+    headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("gzip, deflate, br"));
+    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en-US,en;q=0.9,lt;q=0.8,et;q=0.7,de;q=0.6"));
+
+    let client = Client::builder()
+        .default_headers(headers)
+        .build()?;
+
+    Ok(client)
+}
+
+async fn scrape_jobs(base_url: &str, query: &str) -> Result<(), Box<dyn Error>> {
     let mut start = 0;
     let mut job_links: Vec<String> = Vec::new();
     let mut has_next_page = true;
 
-    let client = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-        .build()?;
+    let client = build_client().await?;
 
     while has_next_page {
         let url = Url::parse_with_params(
@@ -23,41 +35,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ("start", &start.to_string()),
             ],
         )?;
-
         println!("Fetching page: {}", url);
 
-        let resp = client.get(url).send().await?.text().await?;
-        let document = Html::parse_document(&resp);
+        let page_content = client.get(url).send().await?.text().await?;
+        let document = Html::parse_document(&page_content);
+
+        println!("Page fetched successfully, {}", page_content);
 
         let link_selector = Selector::parse("a").unwrap();
-        let next_selector = Selector::parse("a#pnnext").unwrap();
+        let job_links_found: Vec<String> = document
+            .select(&link_selector)
+            .filter_map(|element| {
+                element.value().attr("href").map(|href| {
+                    if href.contains("greenhouse.io") && (href.contains("/jobs/") || href.contains("/job_app")) {
+                        href.to_string()
+                    } else {
+                        String::new()
+                    }
+                })
+            })
+            .filter(|href| !href.is_empty())
+            .collect();
 
-        println!("Searching for job links...");
-        let mut job_links_found = 0;
-        for element in document.select(&link_selector) {
-            if let Some(href) = element.value().attr("href") {
-                if href.contains("greenhouse.io") && (href.contains("/jobs/") || href.contains("/job_app")) {
-                    job_links_found += 1;
-                    job_links.push(href.to_string());
-                }
-            }
-        }
-        println!("Found {} job links on this page", job_links_found);
+        println!("Found {} job links on this page", job_links_found.len());
+        job_links.extend(job_links_found);
 
-        println!("Searching for next button...");
+        let next_selector = Selector::parse("#pnnext").unwrap();
         let next_elements: Vec<_> = document.select(&next_selector).collect();
-        println!("Found {} elements matching the next selector", next_elements.len());   
-        
         has_next_page = !next_elements.is_empty();
         if has_next_page {
-            start += 10; 
+            start += 10;
             println!("Moving to next page...");
         } else {
             println!("No more pages to process.");
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        sleep(Duration::from_secs(5)).await;
     }
+
+    Ok(())
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let base_url = "https://www.google.com/search";
+    let query = "Software Engineer Intern site:greenhouse.io";
+
+    scrape_jobs(base_url, query).await?;
 
     Ok(())
 }
