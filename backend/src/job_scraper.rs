@@ -4,7 +4,6 @@ use scraper::{Html, Selector};
 use crate::constants::rules::{JobRule, JOB_RULES, UUID_PATTERN};
 use url::Url;
 
-
 pub struct JobScraper {
     base_url: String,
     query: String,
