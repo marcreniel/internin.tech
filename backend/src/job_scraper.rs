@@ -3,9 +3,9 @@ use regex::Regex;
 use scraper::{Html, Selector};
 use crate::constants::rules::{JobRule, JOB_RULES, UUID_PATTERN};
 use url::Url;
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use serde_json::json;
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, BufRead, Write};
+use serde_json::{Value, json};
 
 pub struct JobScraper {
     base_url: String,
@@ -61,7 +61,7 @@ impl JobScraper {
         Ok(())
     }
 
-    pub async fn scrape(&self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn google_scraper(&self) -> Result<(), Box<dyn std::error::Error>> {
         for site in &self.sites {
             let mut start = 0;
             let mut has_next_page = true;
@@ -102,9 +102,72 @@ impl JobScraper {
                     println!("No more pages to process for site: {}", site);
                 }
 
-                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
             }
         }
+        Ok(())
+    }
+    
+    async fn process_links(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let input_file = File::open("output/links.json")?;
+        let reader = BufReader::new(input_file);
+    
+        let output_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open("output/processed.json")?;
+        let mut writer = std::io::BufWriter::new(output_file);
+    
+        for line in reader.lines() {
+            let line = line?;
+            let json: Value = serde_json::from_str(&line)?;
+            
+            if let Some(link) = json["link"].as_str() {
+                let processed_link = link.trim_end_matches("/apply").to_string();
+                
+                println!("Fetching content for: {}", processed_link);
+                
+                let resp = self.client.get(&processed_link).send().await?;
+                let html_content = resp.text().await?;
+    
+                let document = Html::parse_document(&html_content);
+                
+                let selector = Selector::parse("body > *:not(script):not(style):not(form)").unwrap();
+                let mut text_content: String = document.select(&selector)
+                    .flat_map(|element| element.text())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+    
+                text_content = text_content.split_whitespace().collect::<Vec<_>>().join(" ");
+    
+                let apply_regex = Regex::new(r"(?i)Apply for this job.*$").unwrap();
+                text_content = apply_regex.replace(&text_content, "").to_string();
+    
+                let entity_regex = Regex::new(r"&[a-zA-Z]+;").unwrap();
+                text_content = entity_regex.replace_all(&text_content, "").to_string();
+    
+                let processed_json = json!({
+                    "link": processed_link,
+                    "content": text_content.trim()
+                });
+    
+                writeln!(writer, "{}", serde_json::to_string(&processed_json)?)?;
+            }
+    
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        }
+    
+        writer.flush()?;
+        Ok(())
+    }
+
+    pub async fn run_scraper(&self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("Starting Google scraping...");
+        self.google_scraper().await?;
+        println!("Google scraping completed. Processing links...");
+        self.process_links().await?;
+        println!("Link processing completed.");
         Ok(())
     }
 }

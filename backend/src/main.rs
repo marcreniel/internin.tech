@@ -8,21 +8,14 @@ use tokio;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sites = vec![
         "greenhouse.io",
-        "lever.co",
-        "ashbyhq.com",
-        "paylocity.com",
-        "workable.com",
-        "icims.com",
-        "myworkdayjobs.com",
-        "jobvite.com",
-        "breezy.hr",
-        "jobs.smartrecruiters.com/",
     ];
 
-    let scraper = JobScraper::new("https://www.google.com/search", "Software Engineer Intern", "qdr:d", sites)?;
-    scraper.scrape().await?;
+    let scraper = JobScraper::new("https://www.google.com/search", r#"allintitle: Intern"#, "qdr:d", sites.clone())?;
+    scraper.run_scraper().await?;
 
-    println!("Scraping completed. Check output/links.json for the results.");
+    println!("Scraping and processing completed.");
+    println!("Check output/links.json for the initial scraped links.");
+    println!("Check output/processed.json for the processed page contents.");
 
     Ok(())
 }
