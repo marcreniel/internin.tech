@@ -15,12 +15,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "greenhouse.io",
     ];
 
-    let mut scraper = ScraperClient::new("https://www.google.com/search", r#"allintitle: Intern"#, "qdr:d", sites.clone())?;
+    let mut scraper = ScraperClient::new("https://www.google.com/search", r#"allintitle: Intern"#, "qdr:d", sites.clone(), &supabase_client)?;
     scraper.run_scraper().await?;
 
     println!("Scraping and processing completed.");
-    println!("Check output/links.json for the initial scraped links.");
-    println!("Check output/processed.json for the processed page contents.");
-    
     Ok(())
 }

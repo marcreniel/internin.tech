@@ -2,32 +2,35 @@ use reqwest;
 use regex::Regex;
 use scraper::{Html, Selector};
 use crate::constants::rules::{JobRule, JOB_RULES, UUID_PATTERN};
+use crate::SupabaseClient;
 use url::Url;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufRead, Write};
 use serde_json::{Value, json};
 use chrono::{Local, NaiveDateTime};
 
-pub struct ScraperClient {
+pub struct ScraperClient<'a> {
     base_url: String,
     query: String,
     tbs: String,
     client: reqwest::Client,
     sites: Vec<&'static str>,
+    supabase_client: &'a SupabaseClient,
 }
 
-impl ScraperClient {
-    pub fn new(base_url: &str, query: &str, tbs: &str, sites: Vec<&'static str>) -> Result<Self, Box<dyn std::error::Error>> {
+impl<'a> ScraperClient<'a> {
+    pub fn new(base_url: &str, query: &str, tbs: &str, sites: Vec<&'static str>, supabase_client: &'a SupabaseClient) -> Result<Self, Box<dyn std::error::Error>> {
         let client = reqwest::Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
             .build()?;
-
+        
         Ok(Self {
             base_url: base_url.to_string(),
             query: query.to_string(),
             tbs: tbs.to_string(),
             client,
             sites,
+            supabase_client,
         })
     }
 
@@ -126,26 +129,7 @@ impl ScraperClient {
         Ok(())
     }
 
-    async fn write_links_to_processed(&self, processed_links: Vec<Value>, output_file_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let output_file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .append(true)
-            .open(output_file_path)?;
-        let mut writer = std::io::BufWriter::new(output_file);
-
-        for processed_link in processed_links {
-            writeln!(writer, "{}", serde_json::to_string(&processed_link)?)?;
-        }
-
-        writer.flush()?;
-        Ok(())
-    }
-
     async fn process_links(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let timestamp = Local::now().format("%Y%m%d_%H%M%S");
-        let output_file_path = format!("output/processed_{}.json", timestamp);
-    
         let latest_input_file = std::fs::read_dir("output")?
             .filter_map(|entry| {
                 let entry = entry.ok()?;
@@ -166,7 +150,6 @@ impl ScraperClient {
             println!("Processing the latest file: {:?}", input_file_path);
             let input_file = File::open(&input_file_path)?;
             let reader = BufReader::new(input_file);
-            let mut processed_links = Vec::new();
     
             for line in reader.lines() {
                 let line = line?;
@@ -187,28 +170,14 @@ impl ScraperClient {
                     text_content = apply_regex.replace(&text_content, "").to_string();
                     let entity_regex = Regex::new(r"&[a-zA-Z]+;").unwrap();
                     text_content = entity_regex.replace_all(&text_content, "").to_string();
-                    let processed_json = json!({
-                        "link": processed_link,
-                        "content": text_content.trim()
-                    });
-                    processed_links.push(processed_json);
+    
+                    // Insert into database
+                    self.supabase_client.insert(&processed_link, &text_content).await?;
                 }
-    
-                if processed_links.len() >= 10 {
-                    self.write_links_to_processed(processed_links, &output_file_path).await?;
-                    processed_links = Vec::new();
-                }
-    
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-            }
-    
-            if !processed_links.is_empty() {
-                self.write_links_to_processed(processed_links, &output_file_path).await?;
             }
         } else {
             println!("No links_.json files found in the output directory.");
         }
-    
         Ok(())
     }
 
