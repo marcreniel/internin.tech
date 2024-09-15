@@ -8,7 +8,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufRead, Write};
 use serde_json::{Value, json};
 use chrono::{Local, NaiveDateTime};
-use fantoccini::{ClientBuilder, Locator};
+use fantoccini::{ClientBuilder};
 use tokio;
 
 pub struct ScraperClient<'a> {
@@ -185,7 +185,7 @@ impl<'a> ScraperClient<'a> {
     }
 
     async fn fetch_content(&self, url: &str) -> Result<String, fantoccini::error::CmdError> {
-        let mut client = ClientBuilder::native()
+        let client = ClientBuilder::native()
             .connect("http://localhost:4444")
             .await
             .expect("failed to connect to WebDriver");

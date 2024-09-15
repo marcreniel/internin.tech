@@ -1,6 +1,8 @@
 use postgrest::Postgrest;
 use dotenv::dotenv;
 use serde_json::json;
+use chrono::{DateTime, Utc}; 
+use std::time::SystemTime;
 
 pub struct SupabaseClient {
     client: Postgrest,
@@ -35,9 +37,14 @@ impl SupabaseClient {
     }
 
     pub async fn insert(&self, id: &str, data: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let now = SystemTime::now();
+        let now: DateTime<Utc> = now.into();
+        let now = now.to_rfc3339();
+
         let record = json!([{
             "id": id,
-            "data": data
+            "data": data,
+            "updated": now
         }]);
 
         let response = self.client
