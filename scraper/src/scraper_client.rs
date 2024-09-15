@@ -8,6 +8,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufRead, Write};
 use serde_json::{Value, json};
 use chrono::{Local, NaiveDateTime};
+use fantoccini::{ClientBuilder, Locator};
+use tokio;
 
 pub struct ScraperClient<'a> {
     base_url: String,
@@ -70,7 +72,9 @@ impl<'a> ScraperClient<'a> {
     }
 
     async fn google_scraper(&self) -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::remove_dir_all("output")?;
         std::fs::create_dir_all("output")?;
+
         let timestamp = Local::now().format("%Y%m%d_%H%M%S");
         let file_path = format!("output/links_{}.json", timestamp);
 
@@ -157,8 +161,8 @@ impl<'a> ScraperClient<'a> {
                 if let Some(link) = json["link"].as_str() {
                     let processed_link = link.trim_end_matches("/apply").to_string();
                     println!("Fetching content for: {}", processed_link);
-                    let resp = self.client.get(&processed_link).send().await?;
-                    let html_content = resp.text().await?;
+
+                    let html_content = self.fetch_content(&processed_link).await?;
                     let document = Html::parse_document(&html_content);
                     let selector = Selector::parse("body > *:not(script):not(style):not(form)").unwrap();
                     let mut text_content: String = document.select(&selector)
@@ -171,7 +175,6 @@ impl<'a> ScraperClient<'a> {
                     let entity_regex = Regex::new(r"&[a-zA-Z]+;").unwrap();
                     text_content = entity_regex.replace_all(&text_content, "").to_string();
     
-                    // Insert into database
                     self.supabase_client.insert(&processed_link, &text_content).await?;
                 }
             }
@@ -179,6 +182,19 @@ impl<'a> ScraperClient<'a> {
             println!("No links_.json files found in the output directory.");
         }
         Ok(())
+    }
+
+    async fn fetch_content(&self, url: &str) -> Result<String, fantoccini::error::CmdError> {
+        let mut client = ClientBuilder::native()
+            .connect("http://localhost:4444")
+            .await
+            .expect("failed to connect to WebDriver");
+
+        client.goto(url).await?;
+        let content = client.source().await?;
+        client.close().await?;
+
+        Ok(content)
     }
 
     pub async fn run_scraper(&mut self) -> Result<(), Box<dyn std::error::Error>> {
