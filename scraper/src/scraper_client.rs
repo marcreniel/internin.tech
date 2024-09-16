@@ -191,6 +191,8 @@ impl ScraperClient {
             .await
             .expect("failed to connect to WebDriver");
         client.goto(url).await?;
+        // Wait for the page to fully load all content
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
         let content = client.source().await?;
         client.close().await?;
         Ok(content)
