@@ -3,13 +3,15 @@ use dotenv::dotenv;
 use serde_json::json;
 use chrono::{DateTime, Utc}; 
 use std::time::SystemTime;
+use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct SupabaseClient {
-    client: Postgrest,
+    client: Arc<Postgrest>,
 }
 
 impl SupabaseClient {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         println!("Loading Supabase client...");
         dotenv().ok();
         
@@ -21,10 +23,10 @@ impl SupabaseClient {
             .insert_header("apikey", public_key)
             .insert_header("Authorization", format!("Bearer {}", service_key));
 
-        Ok(Self { client })
+        Ok(Self { client: Arc::new(client) })
     }
 
-    pub async fn ping(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn ping(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let response = self.client.from("ping").select("*").execute().await?;
         
         if response.status().is_success() {
@@ -36,7 +38,7 @@ impl SupabaseClient {
         }
     }
 
-    pub async fn insert(&self, id: &str, data: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn insert(&self, id: &str, data: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let now = SystemTime::now();
         let now: DateTime<Utc> = now.into();
         let now = now.to_rfc3339();
