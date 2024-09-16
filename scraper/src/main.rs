@@ -62,6 +62,8 @@ async fn main() -> Result<(), rocket::Error> {
                 ..Default::default()
             }),
         )
+        .configure(rocket::Config::figment()
+            .merge(("address", "0.0.0.0")))
         .launch()
         .await?;
 
