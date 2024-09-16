@@ -13,15 +13,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let sites = vec![
         "greenhouse.io",
-        // "lever.co",
-        // "ashbyhq.com",
-        // "paylocity.com",
-        // "workable.com",
-        // "icims.com",
-        // "myworkdayjobs.com",
-        // "jobvite.com",
-        // "breezy.hr",
-        // "jobs.smartrecruiters.com/",
+        "lever.co",
+        "ashbyhq.com",
+        "paylocity.com",
+        "workable.com",
+        "icims.com",
+        "myworkdayjobs.com",
+        "jobvite.com",
+        "breezy.hr",
+        "jobs.smartrecruiters.com/",
     ];
 
     let mut scraper = ScraperClient::new("https://www.google.com/search", r#"allintitle: Intern"#, "qdr:d", sites.clone(), &supabase_client)?;

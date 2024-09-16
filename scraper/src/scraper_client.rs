@@ -4,6 +4,7 @@ use scraper::{Html, Selector};
 use crate::constants::rules::{JobRule, JOB_RULES, UUID_PATTERN};
 use crate::SupabaseClient;
 use url::Url;
+use futures::future::join_all;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, BufRead, Write};
 use serde_json::{Value, json};
@@ -71,63 +72,75 @@ impl<'a> ScraperClient<'a> {
         Ok(())
     }
 
-    async fn google_scraper(&self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn initialize_scrape(&self) -> Result<(), Box<dyn std::error::Error>> {
         std::fs::remove_dir_all("output")?;
         std::fs::create_dir_all("output")?;
-
         let timestamp = Local::now().format("%Y%m%d_%H%M%S");
         let file_path = format!("output/links_{}.json", timestamp);
 
-        for site in &self.sites {
-            let mut start = 0;
-            let mut has_next_page = true;
-            let mut scraped_links = Vec::new();
+        let mut tasks = Vec::new();
 
-            while has_next_page {
-                let params = vec![
-                    ("q".to_string(), format!("{} site:{}", self.query, site)),
-                    ("tbs".to_string(), self.tbs.clone()),
-                    ("start".to_string(), start.to_string()),
-                ];
+        for &site in &self.sites {
+            let task = self.scrape_site(site, file_path.clone());
+            tasks.push(task);
+        }
 
-                let url = Url::parse_with_params(&self.base_url, &params)?;
-                println!("Fetching page: {} for site: {}", url, site);
+        join_all(tasks).await;
 
-                let resp = self.client.get(url).send().await?.text().await?;
-                let document = Html::parse_document(&resp);
-                let link_selector = Selector::parse("a").unwrap();
-                let next_selector = Selector::parse("a#pnnext").unwrap();
+        Ok(())
+    }
 
-                let mut job_links_found = 0;
-                for element in document.select(&link_selector) {
-                    if let Some(href) = element.value().attr("href") {
-                        if JOB_RULES.iter().any(|rule| rule.site == *site && Self::matches_rule(href, rule)) {
-                            job_links_found += 1;
-                            let json_link = json!({ "link": href });
-                            scraped_links.push(json_link);
-                        }
+    async fn scrape_site(&self, site: &'static str, file_path: String) -> Result<(), Box<dyn std::error::Error>> {
+        let mut start = 0;
+        let mut has_next_page = true;
+        let mut scraped_links = Vec::new();
+
+        while has_next_page {
+            let params = vec![
+                ("q".to_string(), format!("{} site:{}", self.query, site)),
+                ("tbs".to_string(), self.tbs.clone()),
+                ("start".to_string(), start.to_string()),
+            ];
+
+            let url = Url::parse_with_params(&self.base_url, &params)?;
+            println!("Fetching page: {} for site: {}", url, site);
+
+            let resp = self.client.get(url).send().await?.text().await?;
+            let document = Html::parse_document(&resp);
+
+            let link_selector = Selector::parse("a").unwrap();
+            let next_selector = Selector::parse("a#pnnext").unwrap();
+
+            let mut job_links_found = 0;
+
+            for element in document.select(&link_selector) {
+                if let Some(href) = element.value().attr("href") {
+                    if JOB_RULES.iter().any(|rule| rule.site == site && Self::matches_rule(href, rule)) {
+                        job_links_found += 1;
+                        let json_link = json!({ "link": href });
+                        scraped_links.push(json_link);
                     }
                 }
-
-                println!("Found {} job links on this page for site: {}", job_links_found, site);
-
-                let next_elements: Vec<_> = document.select(&next_selector).collect();
-                has_next_page = !next_elements.is_empty();
-                
-                if scraped_links.len() >= 10 || !has_next_page {
-                    self.write_scraped_to_links(scraped_links, &file_path).await?;
-                    scraped_links = Vec::new();
-                }
-
-                if has_next_page {
-                    start += 10;
-                    println!("Moving to next page...");
-                } else {
-                    println!("No more pages to process for site: {}", site);
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
             }
+
+            println!("Found {} job links on this page for site: {}", job_links_found, site);
+
+            let next_elements: Vec<_> = document.select(&next_selector).collect();
+            has_next_page = !next_elements.is_empty();
+
+            if scraped_links.len() >= 10 || !has_next_page {
+                self.write_scraped_to_links(scraped_links.clone(), &file_path).await?;
+                scraped_links.clear();
+            }
+
+            if has_next_page {
+                start += 10;
+                println!("Moving to next page...");
+            } else {
+                println!("No more pages to process for site: {}", site);
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
         }
 
         Ok(())
@@ -199,7 +212,7 @@ impl<'a> ScraperClient<'a> {
 
     pub async fn run_scraper(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("Starting Google scraping...");
-        self.google_scraper().await?;
+        self.initialize_scrape().await?;
         println!("Google scraping completed. Processing links...");
         self.process_links().await?;
         println!("Link processing completed.");
