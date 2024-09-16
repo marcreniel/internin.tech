@@ -93,7 +93,7 @@ impl ScraperClient {
         let mut start = 0;
         let mut has_next_page = true;
         let mut scraped_links = Vec::new();
-        let site = site.to_string(); // Clone site once, outside the loop
+        let site = site.to_string();
     
         while has_next_page {
             let params = vec![
@@ -105,7 +105,7 @@ impl ScraperClient {
             println!("Fetching page: {} for site: {}", url, site);
             let resp = self.client.get(url).send().await?.text().await?;
             
-            let site_clone = site.clone(); // Clone site for each iteration
+            let site_clone = site.clone();
             let spawn_result = tokio::task::spawn_blocking(move || {
                 let document = Html::parse_document(&resp);
                 let link_selector = Selector::parse("a").unwrap();
