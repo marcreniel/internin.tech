@@ -56,9 +56,9 @@ async fn main() -> Result<(), rocket::Error> {
         .manage(Arc::new(Mutex::new(scraper)))
         .mount("/", openapi_get_routes![start_scraping])
         .mount(
-            "/",
+            "/scraper-docs",
             make_swagger_ui(&SwaggerUIConfig {
-                url: "../openapi.json".to_owned(),
+                url: "/openapi.json".to_owned(),
                 ..Default::default()
             }),
         )
