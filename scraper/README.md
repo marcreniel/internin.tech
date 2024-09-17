@@ -45,6 +45,20 @@ Please open an issue if you have a job board request, or if you can implement a 
    cargo run
    ```
 
+## Rebuilding Docker Images
+Apple Silicon Users can run via Rosetta Emulation.
+
+1. **Build the Image**
+   ```sh
+   docker --debug buildx build --platform linux/amd64 -t ziptern-scraper --load -f docker/Dockerfile .
+   ```
+
+2. **Run the Image**
+   ```sh
+   docker run -p 4444:4444 -p 8000:8000 -it --rm --platform linux/amd64 ziptern-scraper                
+   ```
+
+
 ## Configuration
 
 The scraper uses `JobRule` objects to specify scraping rules for each supported site. Here's an example configuration for a site:
