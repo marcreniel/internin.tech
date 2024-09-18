@@ -3,8 +3,8 @@ from fastapi import Depends
 from supabase import create_client, Client
 
 from supabase.client import ClientOptions
-from auth import validate_jwt
-from config import Settings
+from src.auth import validate_jwt
+from src.config import Settings
 
 settings = Settings()
 

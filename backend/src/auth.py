@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import HTTPException, Header
 import jwt
 
-from config import Settings
+from src.config import Settings
 
 settings = Settings()
 
