@@ -38,7 +38,7 @@ Please open an issue if you have a job board request, or if you can implement a 
    cargo build
    ```
 
-3. **Configure scraping rules**: Define the patterns for each website in the `src/rules.rs` file as needed.
+3. **Configure scraping rules**: Define the patterns for each website in the `engine/rules.rs` file as needed.
 
 4. **Run the scraper**:
    ```sh

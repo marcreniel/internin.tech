@@ -1,12 +1,11 @@
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate rocket_okapi;
 
-mod scraper_client;
-mod supabase_client;
-mod constants;
+mod engine;
+mod database;
 
-use scraper_client::ScraperClient;
-use supabase_client::SupabaseClient;
+use engine::client::ScraperClient;
+use database::SupabaseClient;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use rocket::State;

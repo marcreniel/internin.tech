@@ -2,7 +2,7 @@ use std::sync::Arc;
 use reqwest;
 use regex::Regex;
 use scraper::{Html, Selector};
-use crate::constants::rules::{JobRule, JOB_RULES, UUID_PATTERN};
+use crate::engine::rules::{JobRule, JOB_RULES, UUID_PATTERN};
 use crate::SupabaseClient;
 use url::Url;
 use futures::future::join_all;
