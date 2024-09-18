@@ -1,0 +1,1 @@
+from utils.supabase import get_supabase_client
