@@ -28,6 +28,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    from src.jobs import jobs_router
+    app.include_router(jobs_router)
+
     @app.get("/")
     async def home():
         return "Welcome to Ziptern API"
