@@ -24,3 +24,13 @@ async def get_supabase_client(
     supabase.postgrest.auth(access_token)
 
     return supabase
+
+def create_service_client() -> Client:
+    return create_client(
+        settings.supabase_jobs_url,
+        settings.supabase_jobs_service_key,
+        options=ClientOptions(
+            persist_session=False,
+            auto_refresh_token=False,
+        ),
+   )

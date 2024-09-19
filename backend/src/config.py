@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     supabase_users_public_key: str
     supabase_users_jwt: str
 
+    supabase_jobs_url: str
+    supabase_jobs_public_key: str
+    supabase_jobs_service_key: str
+
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
     CELERY_BROKER_USE_SSL: ClassVar[Dict[str, ssl.VerifyMode]] = {
@@ -22,5 +26,5 @@ class Settings(BaseSettings):
     langchain_project: str
 
     openai_api_key: str
-    
+
     model_config = SettingsConfigDict(env_file=".env")
