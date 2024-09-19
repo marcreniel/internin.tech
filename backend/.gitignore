@@ -23,3 +23,6 @@ ENV/
 
 # Compiled Python files
 *.pyc
+
+# Celery stuff
+celerybeat-schedule.db
