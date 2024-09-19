@@ -1,11 +1,10 @@
 from fastapi import APIRouter
-from src.jobs.jobs_processing import retrieve_unstructured
+from src.jobs.tasks import retrieve_unstructured
 
 jobs_router = APIRouter(
     prefix="/jobs",
 )
 
-@jobs_router.get("/unstructured")
-async def get_unstructured():
-    response = await retrieve_unstructured()
-    return response
+@jobs_router.get("/structure-manual")
+def get_unstructured():
+    return retrieve_unstructured()
