@@ -16,4 +16,11 @@ class Settings(BaseSettings):
         'ssl_cert_reqs': ssl.CERT_NONE
     }
     
+    langchain_tracing_v2: str
+    langchain_endpoint: str
+    langchain_api_key: str
+    langchain_project: str
+
+    openai_api_key: str
+    
     model_config = SettingsConfigDict(env_file=".env")
